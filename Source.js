@@ -46,7 +46,7 @@ function CLEANDATA() {
   var hopChoose;
 
 
-  //Compare Hop algorithm (designed by yours truly)
+  //Comparison Algorithm
   /*
   Start from beginning of 2 sorted lists.
   Continue if both indexes are equal.
