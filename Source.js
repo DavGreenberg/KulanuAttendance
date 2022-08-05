@@ -1,98 +1,100 @@
-function CLEANDATA() {
-  //Import sheets
+//finds the people that have hours discrepancies of more than 5 minutes
+function COMPARETOTALHOURS() {
+  var TIME10MIN = 0.17;
   var ss = SpreadsheetApp.getActive();
-  var timestation = ss.getSheets()[0]
-  var ukg = ss.getSheets()[1]
+  var timestation = ss.getSheets()[0].getDataRange().getValues();
+  var ukg = ss.getSheets()[1].getDataRange().getValues();
 
-  //get rid of extra UKG info
-  ukg.deleteRows(1,8);
-  ukg.deleteColumns(1,3);
-  ukg.deleteColumn(2);
-  ukg.deleteColumns(3,6);
-
-  var ukgData = ukg.getDataRange().getValues();
-
-  //filter out unwanted data from ukg name columns & merge first & last name
-  var compiledData = [];
-  for (var i = 0; i < ukgData.length; i++) {
-    if (ukgData[i][1] != "-" && ukgData[i][1] != "") {
-      compiledData.push([ukgData[i].join(" ")])
+  console.log(timestation)
+  
+  //get ukg hours with name
+  var ukgHours = [];
+  for (var i = 8; i < ukg.length - 6; i+=5) {
+    if (ukg[i+1][2] == "-") {
+      ukgHours.push([[ukg[i][3], ukg[i][5]].join(" "), 0]);
+    } else {
+      ukgHours.push([[ukg[i][3], ukg[i][5]].join(" "), parseFloat(ukg[i+1][2])]);
     }
   }
 
-  //sort and set new data on ukg sheet
-  compiledData.sort();
-  ukg.deleteColumns(1,2);
-  ukg.getRange(1, 1, compiledData.length).setValues(compiledData);
+  //get timesheet hours with name
+  var tsHours = [];
+  for (var i = 1; i < timestation.length; i++) {
+    tsHours.push([timestation[i][2], timeToDecimal(timestation[i][4])])
+  }
 
-  //get rid of extra timestation info
-  timestation.deleteColumn(1);
-  timestation.deleteColumns(2, 18);
-  timestation.deleteRow(1);
+  //sort by name
+  ukgHours.sort( function(a, b) {
+    return a[0].localeCompare(b[0]);
+  });
+  tsHours.sort( function(a, b) {
+    return a[0].localeCompare(b[0]);
+  });
 
-  //get simplified timesheet and UKG data and remove any duplicates
-  var tsData = removeDuplicates(timestation.getDataRange().getValues());
-  ukgData = removeDuplicates(compiledData);
-  console.log(tsData)
-  console.log(ukgData)
-
-  //create new variables
-  var missingPeople = [];
-  //index counter for UKG
-  var ukgHop = 0;
-  //index counder for timestation
-  var tsHop = 0;
-  //temp choose variable for discrepencies
-  var hopChoose;
-
-
-  //Comparison Algorithm
+  //Hours Comparison Algorithm
   /*
   Start from beginning of 2 sorted lists.
-  Continue if both indexes are equal.
-  If indexes not equal, sort them. The one at the front of the list is missing from the other.
+  Continue if both names are equal & time difference is <= 5 minutes - if time difference, note in new arr.
+  If names not equal, sort them. The one at the front of the list is missing from the other - note with time in new arr.
   Compare lagged index (the one that was not missing) to the next index of the other list.
   Continue this until one of the "hops" overflows its list.
-  Dump last indeces as missing from opposite list (the one that overflowed)
+  Dump last indeces as missing from opposite list (the one that overflowed) and include time
   */
-  for (var i = 0; i < Math.max(tsData.length, ukgData.length); i++) {
+  var CURRUKG;
+  var CURRTS;
+  var TIMEDIFF;
+  var ukgHop = 0;
+  var tsHop = 0
+  var hoursDiscrepancies = []
+  for (var i = 0; i < Math.max(tsHours.length, ukgHours.length); i++) {
+    CURRUKG = ukgHours[ukgHop];
+    CURRTS = tsHours[tsHop];
     //check for overflow
-    if (ukgHop > ukgData.length) {
+    if (ukgHop > ukgHours.length) {
       //iterate through remaining
-      for (var j = 0; j < tsData.length - ukgHop; j++) {
-        missingPeople.push(tsData[j][0] + " is missing from UKG");
+      for (var j = 0; j < tsHours.length - ukgHop; j++) {
+        hoursDiscrepancies.push([tsHours[j][0] + " is missing from UKG. TimeStation Hours - " + CURRTS[1]]);
       }
       break;
-    } else if (tsHop > tsData.length) {
+    } else if (tsHop > tsHours.length) {
       //iterate through remaining
-      for (var j = 0; j < ukgData.length - tsHop; j++) {
-        missingPeople.push(ukgData[j][0] + " is missing from Timestation");
+      for (var j = 0; j < ukgHours.length - tsHop; j++) {
+        hoursDiscrepancies.push([ukgHours[j][0] + " is missing from Timestation. UKG Hours - " + CURRUKG[1]]);
       }
       break;
     }
-    //if same, continue
-    if (ukgData[ukgHop][0] == tsData[tsHop][0]) {
+    //if same, continue & compare times
+    if (CURRUKG[0] == CURRTS[0]) {
+      TIMEDIFF = Math.abs(CURRUKG[1] - CURRTS[1])
+      if (TIMEDIFF > TIME10MIN) {
+        hoursDiscrepancies.push([CURRUKG[0] + " has time discrepancy: UKG - " + CURRUKG[1] + " TimeStation - " + CURRTS[1] + " (" + TIMEDIFF + ")"])
+      }
       tsHop++;
       ukgHop++;
     } else {
       //compare indeces
-      hopChoose = [ukgData[ukgHop][0], tsData[tsHop][0]].sort();
+      hopChoose = [CURRUKG[0], CURRTS[0]].sort();
       //find & push missing indeces, add to one hop
-      if (hopChoose[0] == ukgData[ukgHop][0]) {
-        missingPeople.push([ukgData[ukgHop][0] + " is missing from Timestation"]);
+      if (hopChoose[0] == CURRUKG[0]) {
+        hoursDiscrepancies.push([CURRUKG[0] + " is missing from Timestation. UKG Hours - " + CURRUKG[1]]);
         ukgHop++;
       } else {
-        missingPeople.push([tsData[tsHop][0] + " is missing from UKG"]);
+        hoursDiscrepancies.push([CURRTS[0] + " is missing from UKG. TimeStation Hours - " + CURRTS[1]]);
         tsHop++;
       }
     }
   }
 
-  console.log(missingPeople)
-
-  //display missing people
-  ukg.getRange(1, 3, missingPeople.length).setValues(missingPeople);
+  console.log(hoursDiscrepancies);
+  ss.insertSheet("Found Discrepancies");
+  var foundSheet = ss.getSheetByName("Found Discrepancies");
+  foundSheet.getRange(1, 1, hoursDiscrepancies.length).setValues(hoursDiscrepancies);
 }
+
+function timeToDecimal(t) {
+  t = t.split(':');
+  return parseInt(t[0]) + parseFloat((parseInt(t[1])/60).toFixed(2));
+}  
 
 //removes duplicates using hash table
 function removeDuplicates(a) {
