@@ -4,15 +4,19 @@ function COMPARETOTALHOURS() {
   var ss = SpreadsheetApp.getActive();
   var timestation = ss.getSheets()[0].getDataRange().getValues();
   var ukg = ss.getSheets()[1].getDataRange().getValues();
-
-  console.log(timestation)
   
   //get ukg hours with name
   var ukgHours = [];
   for (var i = 8; i < ukg.length - 6; i+=5) {
+    //check for PTO
+    if (ukg[i+1][11] != "") {
+      continue;
+    }
     if (ukg[i+1][2] == "-") {
+      //if forgot to clock out, 0 hours
       ukgHours.push([[ukg[i][3], ukg[i][5]].join(" "), 0]);
     } else {
+      //add name & hours to arr
       ukgHours.push([[ukg[i][3], ukg[i][5]].join(" "), parseFloat(ukg[i+1][2])]);
     }
   }
@@ -86,11 +90,14 @@ function COMPARETOTALHOURS() {
   }
 
   console.log(hoursDiscrepancies);
+  
+  //create new sheet and add found discrepancies
   ss.insertSheet("Found Discrepancies");
   var foundSheet = ss.getSheetByName("Found Discrepancies");
   foundSheet.getRange(1, 1, hoursDiscrepancies.length).setValues(hoursDiscrepancies);
 }
 
+//converts HH:MM to decimal
 function timeToDecimal(t) {
   t = t.split(':');
   return parseInt(t[0]) + parseFloat((parseInt(t[1])/60).toFixed(2));
