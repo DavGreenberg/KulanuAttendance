@@ -7,7 +7,11 @@ function COMPARETOTALHOURS() {
   
   //get ukg hours with name
   var ukgHours = [];
-  for (var i = 8; i < ukg.length - 6; i+=5) {
+  for (var i = 8; i < ukg.length - 6; i++) {
+    //make sure getting name
+    if (!isNaN(ukg[i][3]) || ukg[i][3] == "") {
+      continue;
+    }
     //check for PTO
     if (ukg[i+1][11] != "") {
       continue;
@@ -27,6 +31,9 @@ function COMPARETOTALHOURS() {
     tsHours.push([timestation[i][2], timeToDecimal(timestation[i][4])])
   }
 
+  console.log(ukgHours)
+  console.log(tsHours)
+
   //sort by name
   ukgHours.sort( function(a, b) {
     return a[0].localeCompare(b[0]);
@@ -34,6 +41,8 @@ function COMPARETOTALHOURS() {
   tsHours.sort( function(a, b) {
     return a[0].localeCompare(b[0]);
   });
+
+  
 
   //Hours Comparison Algorithm
   /*
